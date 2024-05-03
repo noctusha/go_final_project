@@ -1,15 +1,18 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net/http"
-    "os"
-    "path/filepath"
-    "database/sql"
-    _ "modernc.org/sqlite"
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
 
-    "github.com/joho/godotenv"
+	_ "modernc.org/sqlite"
+
+	"github.com/joho/godotenv"
+	"github.com/noctusha/finalya/repeat"
 )
 
 func launchingServer() {
@@ -72,6 +75,15 @@ func main() {
     if err != nil {
         log.Fatal("Error loading .env file")
     }
+
+	Repeat := "m 31,-1 6,7" // по умолчанию также идет из DB
+	DatelinefromDB := "20140102"
+	s, err := repeat.NextDate(time.Now(), DatelinefromDB, Repeat)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(s)
 
     fmt.Println("server is running")
     connectingDB()
