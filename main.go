@@ -15,11 +15,45 @@ import (
 	"github.com/noctusha/finalya/repeat"
 )
 
-func launchingServer() {
+
+/*func launchingServer() {
     err := http.ListenAndServe(os.Getenv("TODO_PORT"), http.FileServer(http.Dir("web")))
     if err != nil {
         log.Fatal("Error handling Listen and Serve")
     }
+}
+*/
+
+func NextDateHandler(w http.ResponseWriter, r *http.Request) {
+
+	now := r.URL.Query().Get("now")
+	date := r.URL.Query().Get("date")
+	repeatt := r.URL.Query().Get("repeat")
+
+	// Проверка наличия параметров
+	if now == "" || date == "" || repeatt == "" {
+		http.Error(w, "Missing parameters", http.StatusBadRequest)
+		return
+	}
+
+	nowTime, err := time.Parse("20060102", now)
+	if err != nil {
+		return
+	}
+
+	// Вызов функции NextDate из пакета repeat
+	nextDate, err := repeat.NextDate(nowTime, date, repeatt)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("nextDate"))
+		return
+	}
+
+	// Отправка успешного ответа
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(nextDate))
 }
 
 func connectingDB() {
@@ -76,16 +110,22 @@ func main() {
         log.Fatal("Error loading .env file")
     }
 
-	Repeat := "m 31,-1 6,7" // по умолчанию также идет из DB
-	DatelinefromDB := "20140102"
-	s, err := repeat.NextDate(time.Now(), DatelinefromDB, Repeat)
-	if err != nil {
-		log.Fatal(err)
-	}
+    // Создаем новый маршрутизатор
+    mux := http.NewServeMux()
 
-	fmt.Println(s)
+    // Обработчик для API
+    mux.HandleFunc("/api/nextdate", NextDateHandler)
 
+    // Обработчик для статических файлов
+    fs := http.FileServer(http.Dir("web"))
+    mux.Handle("/", http.StripPrefix("/", fs))
+
+    // Запускаем сервер с маршрутизатором
     fmt.Println("server is running")
     connectingDB()
-    launchingServer()
+    err = http.ListenAndServe(os.Getenv("TODO_PORT"), mux)
+    if err != nil {
+        log.Fatal("Error handling Listen and Serve")
+    }
+
 }
