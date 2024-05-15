@@ -148,20 +148,34 @@ func NewTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 func ListTasksHandler(w http.ResponseWriter, r *http.Request) {
         tasks := []Task{}
-        task := Task{}
         db := connection.ConnectingDB()
         defer db.Close()
 
+        search := r.URL.Query().Get("search")
 
-            rows, err := db.Query("select date, title, comment, repeat from scheduler order by date limit :limit", sql.Named("limit", 20))
+        var rows *sql.Rows
+		var err error
 
+        if search == "" {
+            rows, err = db.Query("select date, title, comment, repeat from scheduler order by date limit :limit", sql.Named("limit", 20))
+        } else {
+            searchdate, err := time.Parse("02.01.2006", search)
             if err != nil {
-                respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
-                return
+				rows, err = db.Query("SELECT date, title, comment, repeat FROM scheduler WHERE title LIKE ? OR comment LIKE ? ORDER BY date LIMIT ?", "%"+search+"%", "%"+search+"%", 20)
+            } else {
+				correctsearchdate := searchdate.Format("20060102")
+                rows, err = db.Query("select date, title, comment, repeat from scheduler where date = ?", correctsearchdate)
             }
-            defer rows.Close()
+        }
+
+			if err != nil {
+                    respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
+                    return
+                }
+				defer rows.Close()
 
             for rows.Next() {
+				task := Task{}
                 err := rows.Scan(&task.Date, &task.Title, &task.Comment, &task.Repeat)
                 if err != nil {
                     respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
