@@ -6,12 +6,12 @@ import (
     "encoding/json"
     "net/http"
     "time"
-	"errors"
+    "errors"
 
     _ "modernc.org/sqlite"
 
     "github.com/noctusha/finalya/repeatRule"
-	"github.com/noctusha/finalya/connection"
+    "github.com/noctusha/finalya/connection"
 )
 
 type Task struct {
@@ -22,32 +22,31 @@ type Task struct {
 }
 
 type JSON struct {
-	ID int64 `json:"id,omitempty"`
-	Err error `json:"error,omitempty"`
+    ID int64 `json:"id,omitempty"`
+    Err error `json:"error,omitempty"`
+    Tasks *[]Task `json:"tasks,omitempty"`
 }
 
 func NextDateHandler(w http.ResponseWriter, r *http.Request) {
-
     now := r.URL.Query().Get("now")
     date := r.URL.Query().Get("date")
     repeat := r.URL.Query().Get("repeat")
 
     // Проверка наличия параметров
     if now == "" || date == "" || repeat == "" {
-        http.Error(w, "Missing parameters", http.StatusBadRequest)
+		respondJSONError(w, "Missing parameters", http.StatusBadRequest)
         return
     }
 
     nowTime, err := time.Parse("20060102", now)
     if err != nil {
+		respondJSONError(w, "Wrong date format", http.StatusBadRequest)
         return
     }
 
     nextDate, err := repeatRule.NextDate(nowTime, date, repeat)
     if err != nil {
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        w.WriteHeader(http.StatusBadRequest)
-        w.Write([]byte("invalid repetition rate"))
+		respondJSONError(w, "Invalid repetition rate", http.StatusBadRequest)
         return
     }
 
@@ -79,48 +78,48 @@ func NewTaskHandler(w http.ResponseWriter, r *http.Request) {
         var buf bytes.Buffer
         var task Task
 
-		_, err := buf.ReadFrom(r.Body)
-    	if err != nil {
-        	respondJSONError(w, "Failed to read request body", http.StatusBadRequest)
-        	return
-    	}
+        _, err := buf.ReadFrom(r.Body)
+        if err != nil {
+            respondJSONError(w, "Failed to read request body", http.StatusBadRequest)
+            return
+        }
 
-		err = json.Unmarshal(buf.Bytes(), &task)
-    	if err != nil {
-        	respondJSONError(w, "Invalid JSON format", http.StatusBadRequest)
-        	return
-    	}
+        err = json.Unmarshal(buf.Bytes(), &task)
+        if err != nil {
+            respondJSONError(w, "Invalid JSON format", http.StatusBadRequest)
+            return
+        }
 
-		if task.Title == "" {
-        	respondJSONError(w, "Missing title", http.StatusBadRequest)
-        	return
-    	}
+        if task.Title == "" {
+            respondJSONError(w, "Missing title", http.StatusBadRequest)
+            return
+        }
 
-		if task.Date == "" {
-        	task.Date = time.Now().Format("20060102")
-    	}
+        if task.Date == "" {
+            task.Date = time.Now().Format("20060102")
+        }
 
-		dateTime, err := time.Parse("20060102", task.Date)
-    	if err != nil {
-        	respondJSONError(w, "Wrong date format", http.StatusBadRequest)
-        	return
-    	}
+        dateTime, err := time.Parse("20060102", task.Date)
+        if err != nil {
+            respondJSONError(w, "Wrong date format", http.StatusBadRequest)
+            return
+        }
 
-		// проверяем разницу дат без учета часов/минут/секунд
-		if dateTime.Before(time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.Now().Location())) {
-        	if task.Repeat == "" {
-            	task.Date = time.Now().Format("20060102")
-        	} else {
-            	task.Date, err = repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
-            	if err != nil {
-                	respondJSONError(w, "Invalid repetition rate", http.StatusBadRequest)
-                	return
-            	}
-        	}
-    	}
+        // проверяем разницу дат без учета часов/минут/секунд
+        if dateTime.Before(time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.Now().Location())) {
+            if task.Repeat == "" {
+                task.Date = time.Now().Format("20060102")
+            } else {
+                task.Date, err = repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
+                if err != nil {
+                    respondJSONError(w, "Invalid repetition rate", http.StatusBadRequest)
+                    return
+                }
+            }
+        }
 
         db := connection.ConnectingDB()
-		defer db.Close()
+        defer db.Close()
 
         res, err := db.Exec("insert into scheduler (date, title, comment, repeat) values (:date, :title, :comment, :repeat)",
         sql.Named("date", task.Date),
@@ -130,19 +129,51 @@ func NewTaskHandler(w http.ResponseWriter, r *http.Request) {
 
         if err != nil {
             respondJSONError(w, "Failed to insert task into database", http.StatusBadRequest)
-        	return
+            return
         }
 
 
-		id, err := res.LastInsertId()
-    	if err != nil {
-        	respondJSONError(w, "Failed to retrieve last insert ID", http.StatusBadRequest)
-        	return
-    	}
+        id, err := res.LastInsertId()
+        if err != nil {
+            respondJSONError(w, "Failed to retrieve last insert ID", http.StatusBadRequest)
+            return
+        }
 
-		respondJSON(w, JSON{ID: id}, http.StatusOK)
+        respondJSON(w, JSON{ID: id}, http.StatusOK)
 
     default:
         return
     }
+}
+
+func ListTasksHandler(w http.ResponseWriter, r *http.Request) {
+        tasks := []Task{}
+        task := Task{}
+        db := connection.ConnectingDB()
+        defer db.Close()
+
+
+            rows, err := db.Query("select date, title, comment, repeat from scheduler order by date limit :limit", sql.Named("limit", 20))
+
+            if err != nil {
+                respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
+                return
+            }
+            defer rows.Close()
+
+            for rows.Next() {
+                err := rows.Scan(&task.Date, &task.Title, &task.Comment, &task.Repeat)
+                if err != nil {
+                    respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+                    return
+                }
+                tasks = append(tasks, task)
+            }
+
+            err = rows.Err()
+            if err != nil {
+                respondJSONError(w, "Failed during rows iteration", http.StatusInternalServerError)
+                return
+            }
+            respondJSON(w, JSON{Tasks: &tasks}, http.StatusOK)
 }

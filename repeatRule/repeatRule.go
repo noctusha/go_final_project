@@ -74,11 +74,11 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 			possibleWeekday = append(possibleWeekday, day)
 		}
 
-		tmp := Now
+		tmp := Now.AddDate(0, 0, 1)
 	top:
 		for {
 			for i := 0; i < len(possibleWeekday); i++ {
-				if int(tmp.Weekday()) == possibleWeekday[i] {
+				if int(tmp.Weekday()) == possibleWeekday[i] || int(tmp.Weekday()) + 7 == possibleWeekday[i] {
 					Alarm = tmp.Format("20060102")
 					break top
 				}
@@ -107,7 +107,11 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 				possibleDay = append(possibleDay, day)
 			}
 
-			tmp := Now
+
+			tmp := Now.AddDate(0, 0, 1)
+			if Now.Before(correctDate) {
+				tmp = correctDate.AddDate(0, 0, 1)
+			}
 			tmpPlusOne := tmp.AddDate(0, 0, 1)
 			tmpPlusTwo := tmp.AddDate(0, 0, 2)
 	topp:
@@ -149,7 +153,10 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 				possibleMonth = append(possibleMonth, month)
 			}
 
-			tmp := Now
+			tmp := Now.AddDate(0, 0, 1)
+			if Now.Before(correctDate) {
+				tmp = correctDate.AddDate(0, 0, 1)
+			}
 
 			to:
 		for {
