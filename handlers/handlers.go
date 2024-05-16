@@ -1,20 +1,20 @@
 package handlers
 
 import (
-    "bytes"
-    "database/sql"
-    "encoding/json"
-    "net/http"
-    "time"
-    "errors"
+	"bytes"
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"time"
 
-    _ "modernc.org/sqlite"
+	_ "modernc.org/sqlite"
 
-    "github.com/noctusha/finalya/repeatRule"
-    "github.com/noctusha/finalya/connection"
+	"github.com/noctusha/finalya/connection"
+	"github.com/noctusha/finalya/repeatRule"
 )
 
 type Task struct {
+	ID		string	`json:"id,omitempty"`
     Date    string  `json:"date"`
     Title   string  `json:"title"`
     Comment string  `json:"comment"`
@@ -23,7 +23,7 @@ type Task struct {
 
 type JSON struct {
     ID int64 `json:"id,omitempty"`
-    Err error `json:"error,omitempty"`
+    Err string `json:"error,omitempty"`
     Tasks *[]Task `json:"tasks,omitempty"`
 }
 
@@ -68,11 +68,11 @@ func respondJSON(w http.ResponseWriter, payload interface{}, statusCode int) {
 }
 
 func respondJSONError(w http.ResponseWriter, message string, statusCode int) {
-    respondJSON(w, JSON{Err: errors.New(message)}, statusCode)
+    respondJSON(w, JSON{Err: message}, statusCode)
 }
 
 
-func NewTaskHandler(w http.ResponseWriter, r *http.Request) {
+func NewOrChangeTaskHandler(w http.ResponseWriter, r *http.Request) {
     switch r.Method {
     case http.MethodPost:
         var buf bytes.Buffer
@@ -141,7 +141,26 @@ func NewTaskHandler(w http.ResponseWriter, r *http.Request) {
 
         respondJSON(w, JSON{ID: id}, http.StatusOK)
 
-    default:
+
+	case http.MethodGet:
+		var task Task
+		id := r.URL.Query().Get("id")
+
+		db := connection.ConnectingDB()
+        defer db.Close()
+
+		row := db.QueryRow("select * from scheduler where id = ?", id)
+
+		err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+            respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+            return
+        }
+
+		respondJSON(w, task, http.StatusOK)
+
+
+	default:
         return
     }
 }
