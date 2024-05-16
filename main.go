@@ -26,8 +26,9 @@ func main() {
 
     // Обработчик для API
     mux.HandleFunc("/api/nextdate", handlers.NextDateHandler)
-    mux.HandleFunc("/api/task", handlers.NewOrChangeTaskHandler)
+    mux.HandleFunc("/api/task", handlers.TaskHandler)
 	mux.HandleFunc("/api/tasks", handlers.ListTasksHandler)
+	mux.HandleFunc("/api/task/done", handlers.DoneTaskHandler)
 
     // Обработчик для статических файлов
     fs := http.FileServer(http.Dir("web"))

@@ -27,6 +27,22 @@ type JSON struct {
     Tasks *[]Task `json:"tasks,omitempty"`
 }
 
+func respondJSON(w http.ResponseWriter, payload interface{}, statusCode int) {
+    response, err := json.Marshal(payload)
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        w.Write([]byte("Internal server error"))
+        return
+    }
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(statusCode)
+    w.Write(response)
+}
+
+func respondJSONError(w http.ResponseWriter, message string, statusCode int) {
+    respondJSON(w, JSON{Err: message}, statusCode)
+}
+
 func NextDateHandler(w http.ResponseWriter, r *http.Request) {
     now := r.URL.Query().Get("now")
     date := r.URL.Query().Get("date")
@@ -55,24 +71,7 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
     w.Write([]byte(nextDate))
 }
 
-func respondJSON(w http.ResponseWriter, payload interface{}, statusCode int) {
-    response, err := json.Marshal(payload)
-    if err != nil {
-        w.WriteHeader(http.StatusInternalServerError)
-        w.Write([]byte("Internal server error"))
-        return
-    }
-    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(statusCode)
-    w.Write(response)
-}
-
-func respondJSONError(w http.ResponseWriter, message string, statusCode int) {
-    respondJSON(w, JSON{Err: message}, statusCode)
-}
-
-
-func NewOrChangeTaskHandler(w http.ResponseWriter, r *http.Request) {
+func TaskHandler(w http.ResponseWriter, r *http.Request) {
     switch r.Method {
     case http.MethodPost:
         var buf bytes.Buffer
@@ -225,6 +224,27 @@ func NewOrChangeTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 		respondJSON(w, JSON{}, http.StatusOK)
 
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+
+		db := connection.ConnectingDB()
+		defer db.Close()
+
+		row := db.QueryRow("select * from scheduler where id = ?", id)
+		var task Task
+		err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+            return
+		}
+
+		_, err = db.Exec("delete from scheduler where id = ?", id)
+			if err != nil {
+				respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
+            	return
+			}
+
+		respondJSON(w, JSON{}, http.StatusOK)
 
 	default:
         return
@@ -275,4 +295,46 @@ func ListTasksHandler(w http.ResponseWriter, r *http.Request) {
                 return
             }
             respondJSON(w, JSON{Tasks: &tasks}, http.StatusOK)
+}
+
+func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+    case http.MethodPost:
+		id := r.URL.Query().Get("id")
+
+		db := connection.ConnectingDB()
+		defer db.Close()
+
+		row := db.QueryRow("select * from scheduler where id = ?", id)
+		var task Task
+		err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+            return
+		}
+
+		if task.Repeat == "" {
+			_, err = db.Exec("delete from scheduler where id = ?", id)
+			if err != nil {
+				respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
+            	return
+			}
+		} else {
+			newdate, err := repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
+			if err != nil {
+				respondJSONError(w, err.Error(), http.StatusBadRequest)
+            	return
+			}
+
+			_, err = db.Exec("UPDATE scheduler set date = ? where id = ?", newdate, id)
+			if err != nil {
+            	respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
+            	return
+        	}
+		}
+		respondJSON(w, JSON{}, http.StatusOK)
+
+	default:
+		return
+	}
 }
