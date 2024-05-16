@@ -160,6 +160,72 @@ func NewOrChangeTaskHandler(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, task, http.StatusOK)
 
 
+
+	case http.MethodPut:
+		var buf bytes.Buffer
+        var task Task
+
+        _, err := buf.ReadFrom(r.Body)
+        if err != nil {
+            respondJSONError(w, "Failed to read request body", http.StatusBadRequest)
+            return
+        }
+
+        err = json.Unmarshal(buf.Bytes(), &task)
+        if err != nil {
+            respondJSONError(w, "Invalid JSON format", http.StatusBadRequest)
+            return
+        }
+
+        if task.Title == "" {
+            respondJSONError(w, "Missing title", http.StatusBadRequest)
+            return
+        }
+
+        if task.Date == "" {
+            task.Date = time.Now().Format("20060102")
+        }
+
+        dateTime, err := time.Parse("20060102", task.Date)
+        if err != nil {
+            respondJSONError(w, "Wrong date format", http.StatusBadRequest)
+            return
+        }
+
+        // проверяем разницу дат без учета часов/минут/секунд
+        if dateTime.Before(time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.Now().Location())) {
+            if task.Repeat == "" {
+                task.Date = time.Now().Format("20060102")
+            } else {
+                task.Date, err = repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
+                if err != nil {
+                    respondJSONError(w, "Invalid repetition rate", http.StatusBadRequest)
+                    return
+                }
+            }
+        }
+
+		db := connection.ConnectingDB()
+        defer db.Close()
+
+		row := db.QueryRow("select * from scheduler where id = ?", task.ID)
+		var tmp Task
+		err = row.Scan(&tmp.ID, &tmp.Date, &tmp.Title, &tmp.Comment, &tmp.Repeat)
+
+		if err != nil {
+			respondJSONError(w, "Task not found", http.StatusBadRequest)
+            return
+		}
+
+		_, err = db.Exec("UPDATE scheduler set date = ?, title = ?, comment = ?, repeat = ? where id = ?", task.Date, task.Title, task.Comment, task.Repeat, task.ID)
+		if err != nil {
+            respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
+            return
+        }
+
+		respondJSON(w, JSON{}, http.StatusOK)
+
+
 	default:
         return
     }
