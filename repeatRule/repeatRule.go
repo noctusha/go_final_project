@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-
 func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err error) {
 
 	/* if len(repeat) == 0 {
@@ -36,8 +35,6 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 		Alarm = tmp.Format("20060102")
 	}
 
-
-
 	if parts[0] == "d" { // вариант с днями
 		if len(parts) != 2 {
 			return "", errors.New("invalid repetition rate")
@@ -58,8 +55,6 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 		Alarm = tmp.Format("20060102")
 	}
 
-
-
 	if parts[0] == "w" {
 		var day int
 		if len(parts) != 2 {
@@ -78,7 +73,7 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 	top:
 		for {
 			for i := 0; i < len(possibleWeekday); i++ {
-				if int(tmp.Weekday()) == possibleWeekday[i] || int(tmp.Weekday()) + 7 == possibleWeekday[i] {
+				if int(tmp.Weekday()) == possibleWeekday[i] || int(tmp.Weekday())+7 == possibleWeekday[i] {
 					Alarm = tmp.Format("20060102")
 					break top
 				}
@@ -86,8 +81,6 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 			tmp = tmp.AddDate(0, 0, 1)
 		}
 	}
-
-
 
 	if parts[0] == "m" {
 		if len(parts) == 1 || len(parts) > 3 {
@@ -107,25 +100,24 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 				possibleDay = append(possibleDay, day)
 			}
 
-
 			tmp := Now.AddDate(0, 0, 1)
 			if Now.Before(correctDate) {
 				tmp = correctDate.AddDate(0, 0, 1)
 			}
 			tmpPlusOne := tmp.AddDate(0, 0, 1)
 			tmpPlusTwo := tmp.AddDate(0, 0, 2)
-	topp:
-		for {
-			for i := 0; i < len(possibleDay); i++ {
-				if int(tmp.Day()) == possibleDay[i] || (possibleDay[i] == -1 && int(tmpPlusOne.Day()) == 1) || (possibleDay[i] == -2 && int(tmpPlusTwo.Day()) == 1) {
-					Alarm = tmp.Format("20060102")
-					break topp
+		topp:
+			for {
+				for i := 0; i < len(possibleDay); i++ {
+					if int(tmp.Day()) == possibleDay[i] || (possibleDay[i] == -1 && int(tmpPlusOne.Day()) == 1) || (possibleDay[i] == -2 && int(tmpPlusTwo.Day()) == 1) {
+						Alarm = tmp.Format("20060102")
+						break topp
+					}
 				}
+				tmp = tmp.AddDate(0, 0, 1)
+				tmpPlusOne = tmpPlusOne.AddDate(0, 0, 1)
+				tmpPlusTwo = tmpPlusTwo.AddDate(0, 0, 1)
 			}
-			tmp = tmp.AddDate(0, 0, 1)
-			tmpPlusOne = tmpPlusOne.AddDate(0, 0, 1)
-			tmpPlusTwo = tmpPlusTwo.AddDate(0, 0, 1)
-		}
 		}
 
 		if len(parts) == 3 {
@@ -158,12 +150,12 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 				tmp = correctDate.AddDate(0, 0, 1)
 			}
 
-			to:
-		for {
-			for i := 0; i < len(possibleMonth); i++ {
-				if int(tmp.Month()) == possibleMonth[i] {
-					tmpPlusOne := tmp.AddDate(0, 0, 1)
-					tmpPlusTwo := tmp.AddDate(0, 0, 2)
+		to:
+			for {
+				for i := 0; i < len(possibleMonth); i++ {
+					if int(tmp.Month()) == possibleMonth[i] {
+						tmpPlusOne := tmp.AddDate(0, 0, 1)
+						tmpPlusTwo := tmp.AddDate(0, 0, 2)
 
 						for {
 							for i := 0; i < len(possibleDay); i++ {
@@ -172,15 +164,15 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 									break to
 								}
 							}
-								tmp = tmp.AddDate(0, 0, 1)
-								tmpPlusOne = tmpPlusOne.AddDate(0, 0, 1)
-								tmpPlusTwo = tmpPlusTwo.AddDate(0, 0, 1)
+							tmp = tmp.AddDate(0, 0, 1)
+							tmpPlusOne = tmpPlusOne.AddDate(0, 0, 1)
+							tmpPlusTwo = tmpPlusTwo.AddDate(0, 0, 1)
 						}
 					}
-				tmp = tmp.AddDate(0, 0, 1)
+					tmp = tmp.AddDate(0, 0, 1)
+				}
 			}
 		}
 	}
-}
 	return Alarm, nil
 }
