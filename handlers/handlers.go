@@ -17,7 +17,7 @@ import (
 )
 
 type Task struct {
-	ID      string `json:"id,omitempty"`
+	ID      string `json:"id"`
 	Date    string `json:"date"`
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
@@ -102,7 +102,6 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
 	repeat := r.URL.Query().Get("repeat")
 
-	// Проверка наличия параметров
 	if now == "" || date == "" || repeat == "" {
 		respondJSONError(w, "Missing parameters", http.StatusBadRequest)
 		return
@@ -125,10 +124,8 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(nextDate))
 }
 
-func TaskHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		var buf bytes.Buffer
+func NewTask(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
 		var task Task
 
 		_, err := buf.ReadFrom(r.Body)
@@ -192,9 +189,10 @@ func TaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		respondJSON(w, JSON{ID: id}, http.StatusOK)
+}
 
-	case http.MethodGet:
-		var task Task
+func ChangeTask(w http.ResponseWriter, r *http.Request) {
+	var task Task
 		id := r.URL.Query().Get("id")
 
 		db := connection.ConnectingDB()
@@ -209,9 +207,10 @@ func TaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		respondJSON(w, task, http.StatusOK)
+}
 
-	case http.MethodPut:
-		var buf bytes.Buffer
+func PushChangedTask(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
 		var task Task
 
 		_, err := buf.ReadFrom(r.Body)
@@ -273,9 +272,10 @@ func TaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		respondJSON(w, JSON{}, http.StatusOK)
+}
 
-	case http.MethodDelete:
-		id := r.URL.Query().Get("id")
+func DeleteTask(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
 
 		db := connection.ConnectingDB()
 		defer db.Close()
@@ -295,6 +295,21 @@ func TaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		respondJSON(w, JSON{}, http.StatusOK)
+}
+
+func TaskHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		NewTask(w, r)
+
+	case http.MethodGet:
+		ChangeTask(w, r)
+
+	case http.MethodPut:
+		PushChangedTask(w, r)
+
+	case http.MethodDelete:
+		DeleteTask(w, r)
 
 	default:
 		return
@@ -312,7 +327,7 @@ func ListTasksHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if search == "" {
-		rows, err = db.Query("select date, title, comment, repeat from scheduler order by date limit :limit", sql.Named("limit", 20))
+		rows, err = db.Query("select id, date, title, comment, repeat from scheduler order by date limit :limit", sql.Named("limit", 20))
 	} else {
 		searchdate, err := time.Parse("02.01.2006", search)
 		if err != nil {
@@ -331,7 +346,7 @@ func ListTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		task := Task{}
-		err := rows.Scan(&task.Date, &task.Title, &task.Comment, &task.Repeat)
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 		if err != nil {
 			respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
 			return
