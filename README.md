@@ -7,11 +7,6 @@ Web-server/application to-do-list.
 
 В .gitignore пихнул только .env, но он указан в Dockerfile (что-то запутался с тем, как иначе указать переменные окружения. А если это единственный путь, то почему тогда .env идет в .gitignore?)
 
-Однако хоть я и прошел все тесты, чувствую, что есть проблемы с редактированием задачи - ловлю ошибку Error: Request failed with status code 400.
-При закрытии ошибки карточка пустая, при изменении данных (ручном заполнении всех колонок, кроме одной) первоначальная задача не изменяется, а создается ее копия с измененным полем.
-
-В остальном более-менее ок.
-
 Допфлагов нет, порт по умолчанию - 7540.
 
 settings.go:
@@ -23,6 +18,6 @@ var FullNextDate = true
 var Search = true
 var Token = ``
 
-Собирал докер командой docker build --tag my-web-server:v2 .;
-запускал docker run -it -p 7540:7540 --name web-server-container my-web-server:v2
+Собирал докер командой docker build --tag my-web-server:v4 .;
+запускал docker run -it -p 7540:7540 --name web-server-container my-web-server:v4
 
