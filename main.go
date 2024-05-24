@@ -24,10 +24,10 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Обработчик для API
-	mux.HandleFunc("/api/nextdate", handlers.Auth(handlers.NextDateHandler))
-	mux.HandleFunc("/api/task", handlers.Auth(handlers.TaskHandler))
-	mux.HandleFunc("/api/tasks", handlers.Auth(handlers.ListTasksHandler))
-	mux.HandleFunc("/api/task/done", handlers.Auth(handlers.DoneTaskHandler))
+	mux.HandleFunc("/api/nextdate", handlers.NextDateHandler)
+	mux.HandleFunc("/api/task", handlers.TaskHandler)
+	mux.HandleFunc("/api/tasks", handlers.ListTasksHandler)
+	mux.HandleFunc("/api/task/done", handlers.DoneTaskHandler)
 
 	// Обработчик для статических файлов
 	fs := http.FileServer(http.Dir("web"))

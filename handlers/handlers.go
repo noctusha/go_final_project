@@ -5,10 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 	"time"
-
-	"github.com/golang-jwt/jwt/v5"
 
 	_ "modernc.org/sqlite"
 
@@ -44,57 +41,6 @@ func respondJSON(w http.ResponseWriter, payload interface{}, statusCode int) {
 
 func respondJSONError(w http.ResponseWriter, message string, statusCode int) {
 	respondJSON(w, JSON{Err: message}, statusCode)
-}
-
-func Auth(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// смотрим наличие пароля
-		passENV := os.Getenv("TODO_PASSWORD")
-		if len(passENV) > 0 {
-			var jwtB string // JWT-токен из куки
-			// получаем куку
-			cookie, err := r.Cookie("token")
-			if err == nil {
-				jwtB = cookie.Value
-			}
-			var valid bool
-			// здесь код для валидации и проверки JWT-токена
-			// ...
-
-			var buf bytes.Buffer
-			var pass string
-
-			_, err = buf.ReadFrom(r.Body)
-			if err != nil {
-				respondJSONError(w, "Failed to read password", http.StatusBadRequest)
-				return
-			}
-
-			err = json.Unmarshal(buf.Bytes(), &pass)
-			if err != nil {
-				respondJSONError(w, "Invalid JSON format", http.StatusBadRequest)
-				return
-			}
-
-			jwtToken := jwt.New(jwt.SigningMethodHS256)
-
-			signedToken, err := jwtToken.SignedString(pass)
-			if err != nil {
-				respondJSONError(w, "Failed to sign jwt", http.StatusBadRequest)
-				return
-			}
-
-			if jwtB != signedToken {
-				valid = false
-			}
-
-			if !valid {
-				respondJSONError(w, "Authentification required", http.StatusUnauthorized)
-				return
-			}
-		}
-		next(w, r)
-	})
 }
 
 func NextDateHandler(w http.ResponseWriter, r *http.Request) {
