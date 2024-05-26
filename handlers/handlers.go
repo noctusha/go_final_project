@@ -8,18 +8,18 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/noctusha/finalya/models"
 	"github.com/noctusha/finalya/connection"
+	"github.com/noctusha/finalya/models"
 	"github.com/noctusha/finalya/repeatRule"
 )
 
 type Handler struct {
-    Repo *connection.Repository
+	Repo *connection.Repository
 }
 
 type JSON struct {
-	ID    int64   `json:"id,omitempty"`
-	Err   string  `json:"error,omitempty"`
+	ID    int64          `json:"id,omitempty"`
+	Err   string         `json:"error,omitempty"`
 	Tasks *[]models.Task `json:"tasks,omitempty"`
 }
 
@@ -110,10 +110,10 @@ func (h *Handler) NewTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := h.Repo.AddTask(task)
-    if err != nil {
-        respondJSONError(w, "Failed to insert task into database", http.StatusBadRequest)
-        return
-    }
+	if err != nil {
+		respondJSONError(w, "Failed to insert task into database", http.StatusBadRequest)
+		return
+	}
 
 	respondJSON(w, JSON{ID: id}, http.StatusOK)
 }
@@ -122,10 +122,10 @@ func (h *Handler) ChangeTask(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 
 	task, err := h.Repo.GetTaskByID(id)
-    if err != nil {
-        respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
-        return
-    }
+	if err != nil {
+		respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+		return
+	}
 
 	respondJSON(w, task, http.StatusOK)
 }
@@ -174,10 +174,10 @@ func (h *Handler) PushChangedTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.Repo.UpdateTask(task)
-    if err != nil {
-        respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
-        return
-    }
+	if err != nil {
+		respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
+		return
+	}
 
 	respondJSON(w, JSON{}, http.StatusOK)
 }
@@ -186,41 +186,41 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 
 	err := h.Repo.DeleteTask(id)
-    if err != nil {
-        respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
-        return
-    }
+	if err != nil {
+		respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
+		return
+	}
 
 	respondJSON(w, JSON{}, http.StatusOK)
 }
 
 func (h *Handler) TaskHandler(w http.ResponseWriter, r *http.Request) {
-    switch r.Method {
-    case http.MethodPost:
-        h.NewTask(w, r)
+	switch r.Method {
+	case http.MethodPost:
+		h.NewTask(w, r)
 
-    case http.MethodGet:
-        h.ChangeTask(w, r)
+	case http.MethodGet:
+		h.ChangeTask(w, r)
 
-    case http.MethodPut:
-        h.PushChangedTask(w, r)
+	case http.MethodPut:
+		h.PushChangedTask(w, r)
 
-    case http.MethodDelete:
-        h.DeleteTask(w, r)
+	case http.MethodDelete:
+		h.DeleteTask(w, r)
 
-    default:
-        return
-    }
+	default:
+		return
+	}
 }
 
 func (h *Handler) ListTasksHandler(w http.ResponseWriter, r *http.Request) {
 	search := r.URL.Query().Get("search")
 
 	tasks, err := h.Repo.ListTasks(20, search)
-    if err != nil {
-        respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
-        return
-    }
+	if err != nil {
+		respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
+		return
+	}
 
 	respondJSON(w, JSON{Tasks: &tasks}, http.StatusOK)
 }
@@ -228,38 +228,38 @@ func (h *Handler) ListTasksHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
-    case http.MethodPost:
-        id := r.URL.Query().Get("id")
+	case http.MethodPost:
+		id := r.URL.Query().Get("id")
 
-        task, err := h.Repo.GetTaskByID(id)
-        if err != nil {
-            respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
-            return
-        }
+		task, err := h.Repo.GetTaskByID(id)
+		if err != nil {
+			respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+			return
+		}
 
-        if task.Repeat == "" {
-            err = h.Repo.DeleteTask(id)
-            if err != nil {
-                respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
-                return
-            }
-        } else {
-            newdate, err := repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
-            if err != nil {
-                respondJSONError(w, err.Error(), http.StatusBadRequest)
-                return
-            }
+		if task.Repeat == "" {
+			err = h.Repo.DeleteTask(id)
+			if err != nil {
+				respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
+				return
+			}
+		} else {
+			newdate, err := repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
+			if err != nil {
+				respondJSONError(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 
-            task.Date = newdate
-            err = h.Repo.UpdateTask(task)
-            if err != nil {
-                respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
-                return
-            }
-        }
-        respondJSON(w, JSON{}, http.StatusOK)
+			task.Date = newdate
+			err = h.Repo.UpdateTask(task)
+			if err != nil {
+				respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
+				return
+			}
+		}
+		respondJSON(w, JSON{}, http.StatusOK)
 
-    default:
-        return
-    }
+	default:
+		return
+	}
 }

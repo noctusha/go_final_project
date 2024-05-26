@@ -21,12 +21,12 @@ func main() {
 	}
 
 	repo, err := connection.ConnectingDB()
-    if err != nil {
-        log.Fatal("Failed to connect to database")
-    }
-    defer repo.Close()
+	if err != nil {
+		log.Fatal("Failed to connect to database")
+	}
+	defer repo.Close()
 
-    handler := &handlers.Handler{Repo: repo}
+	handler := &handlers.Handler{Repo: repo}
 
 	mux := http.NewServeMux()
 
