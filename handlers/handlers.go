@@ -2,29 +2,25 @@ package handlers
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	_ "modernc.org/sqlite"
 
+	"github.com/noctusha/finalya/models"
 	"github.com/noctusha/finalya/connection"
 	"github.com/noctusha/finalya/repeatRule"
 )
 
-type Task struct {
-	ID      string `json:"id"`
-	Date    string `json:"date"`
-	Title   string `json:"title"`
-	Comment string `json:"comment"`
-	Repeat  string `json:"repeat"`
+type Handler struct {
+    Repo *connection.Repository
 }
 
 type JSON struct {
 	ID    int64   `json:"id,omitempty"`
 	Err   string  `json:"error,omitempty"`
-	Tasks *[]Task `json:"tasks,omitempty"`
+	Tasks *[]models.Task `json:"tasks,omitempty"`
 }
 
 func respondJSON(w http.ResponseWriter, payload interface{}, statusCode int) {
@@ -70,9 +66,9 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(nextDate))
 }
 
-func NewTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) NewTask(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	var task Task
+	var task models.Task
 
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
@@ -101,7 +97,6 @@ func NewTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// проверяем разницу дат без учета часов/минут/секунд
 	if dateTime.Before(time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.Now().Location())) {
 		if task.Repeat == "" {
 			task.Date = time.Now().Format("20060102")
@@ -114,50 +109,30 @@ func NewTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db := connection.ConnectingDB()
-	defer db.Close()
-
-	res, err := db.Exec("insert into scheduler (date, title, comment, repeat) values (:date, :title, :comment, :repeat)",
-		sql.Named("date", task.Date),
-		sql.Named("title", task.Title),
-		sql.Named("comment", task.Comment),
-		sql.Named("repeat", task.Repeat))
-
-	if err != nil {
-		respondJSONError(w, "Failed to insert task into database", http.StatusBadRequest)
-		return
-	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		respondJSONError(w, "Failed to retrieve last insert ID", http.StatusBadRequest)
-		return
-	}
+	id, err := h.Repo.AddTask(task)
+    if err != nil {
+        respondJSONError(w, "Failed to insert task into database", http.StatusBadRequest)
+        return
+    }
 
 	respondJSON(w, JSON{ID: id}, http.StatusOK)
 }
 
-func ChangeTask(w http.ResponseWriter, r *http.Request) {
-	var task Task
+func (h *Handler) ChangeTask(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 
-	db := connection.ConnectingDB()
-	defer db.Close()
-
-	row := db.QueryRow("select * from scheduler where id = ?", id)
-
-	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-	if err != nil {
-		respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
-		return
-	}
+	task, err := h.Repo.GetTaskByID(id)
+    if err != nil {
+        respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+        return
+    }
 
 	respondJSON(w, task, http.StatusOK)
 }
 
-func PushChangedTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PushChangedTask(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
-	var task Task
+	var task models.Task
 
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
@@ -186,7 +161,6 @@ func PushChangedTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// проверяем разницу дат без учета часов/минут/секунд
 	if dateTime.Before(time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.Now().Location())) {
 		if task.Repeat == "" {
 			task.Date = time.Now().Format("20060102")
@@ -199,154 +173,93 @@ func PushChangedTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db := connection.ConnectingDB()
-	defer db.Close()
-
-	row := db.QueryRow("select * from scheduler where id = ?", task.ID)
-	var tmp Task
-	err = row.Scan(&tmp.ID, &tmp.Date, &tmp.Title, &tmp.Comment, &tmp.Repeat)
-
-	if err != nil {
-		respondJSONError(w, "Task not found", http.StatusBadRequest)
-		return
-	}
-
-	_, err = db.Exec("UPDATE scheduler set date = ?, title = ?, comment = ?, repeat = ? where id = ?", task.Date, task.Title, task.Comment, task.Repeat, task.ID)
-	if err != nil {
-		respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
-		return
-	}
+	err = h.Repo.UpdateTask(task)
+    if err != nil {
+        respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
+        return
+    }
 
 	respondJSON(w, JSON{}, http.StatusOK)
 }
 
-func DeleteTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 
-	db := connection.ConnectingDB()
-	defer db.Close()
-
-	row := db.QueryRow("select * from scheduler where id = ?", id)
-	var task Task
-	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-	if err != nil {
-		respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
-		return
-	}
-
-	_, err = db.Exec("delete from scheduler where id = ?", id)
-	if err != nil {
-		respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
-		return
-	}
+	err := h.Repo.DeleteTask(id)
+    if err != nil {
+        respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
+        return
+    }
 
 	respondJSON(w, JSON{}, http.StatusOK)
 }
 
-func TaskHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		NewTask(w, r)
+func (h *Handler) TaskHandler(w http.ResponseWriter, r *http.Request) {
+    switch r.Method {
+    case http.MethodPost:
+        h.NewTask(w, r)
 
-	case http.MethodGet:
-		ChangeTask(w, r)
+    case http.MethodGet:
+        h.ChangeTask(w, r)
 
-	case http.MethodPut:
-		PushChangedTask(w, r)
+    case http.MethodPut:
+        h.PushChangedTask(w, r)
 
-	case http.MethodDelete:
-		DeleteTask(w, r)
+    case http.MethodDelete:
+        h.DeleteTask(w, r)
 
-	default:
-		return
-	}
+    default:
+        return
+    }
 }
 
-func ListTasksHandler(w http.ResponseWriter, r *http.Request) {
-	tasks := []Task{}
-	db := connection.ConnectingDB()
-	defer db.Close()
-
+func (h *Handler) ListTasksHandler(w http.ResponseWriter, r *http.Request) {
 	search := r.URL.Query().Get("search")
 
-	var rows *sql.Rows
-	var err error
-
-	if search == "" {
-		rows, err = db.Query("select id, date, title, comment, repeat from scheduler order by date limit :limit", sql.Named("limit", 20))
-	} else {
-		searchdate, err := time.Parse("02.01.2006", search)
-		if err != nil {
-			rows, err = db.Query("SELECT id, date, title, comment, repeat FROM scheduler WHERE title LIKE ? OR comment LIKE ? ORDER BY date LIMIT ?", "%"+search+"%", "%"+search+"%", 20)
-		} else {
-			correctsearchdate := searchdate.Format("20060102")
-			rows, err = db.Query("select id, date, title, comment, repeat from scheduler where date = ?", correctsearchdate)
-		}
-	}
-
-	if err != nil {
-		respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		task := Task{}
-		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-		if err != nil {
-			respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
-			return
-		}
-		tasks = append(tasks, task)
-	}
-
-	err = rows.Err()
-	if err != nil {
-		respondJSONError(w, "Failed during rows iteration", http.StatusInternalServerError)
-		return
-	}
+	tasks, err := h.Repo.ListTasks(20, search)
+    if err != nil {
+        respondJSONError(w, "Failed to select task from database", http.StatusBadRequest)
+        return
+    }
 
 	respondJSON(w, JSON{Tasks: &tasks}, http.StatusOK)
 }
 
-func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
+
 	switch r.Method {
-	case http.MethodPost:
-		id := r.URL.Query().Get("id")
+    case http.MethodPost:
+        id := r.URL.Query().Get("id")
 
-		db := connection.ConnectingDB()
-		defer db.Close()
+        task, err := h.Repo.GetTaskByID(id)
+        if err != nil {
+            respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
+            return
+        }
 
-		row := db.QueryRow("select * from scheduler where id = ?", id)
-		var task Task
-		err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-		if err != nil {
-			respondJSONError(w, "Failed to scan selected result from database", http.StatusBadRequest)
-			return
-		}
+        if task.Repeat == "" {
+            err = h.Repo.DeleteTask(id)
+            if err != nil {
+                respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
+                return
+            }
+        } else {
+            newdate, err := repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
+            if err != nil {
+                respondJSONError(w, err.Error(), http.StatusBadRequest)
+                return
+            }
 
-		if task.Repeat == "" {
-			_, err = db.Exec("delete from scheduler where id = ?", id)
-			if err != nil {
-				respondJSONError(w, "Failed to delete selected task", http.StatusBadRequest)
-				return
-			}
-		} else {
-			newdate, err := repeatRule.NextDate(time.Now(), task.Date, task.Repeat)
-			if err != nil {
-				respondJSONError(w, err.Error(), http.StatusBadRequest)
-				return
-			}
+            task.Date = newdate
+            err = h.Repo.UpdateTask(task)
+            if err != nil {
+                respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
+                return
+            }
+        }
+        respondJSON(w, JSON{}, http.StatusOK)
 
-			_, err = db.Exec("UPDATE scheduler set date = ? where id = ?", newdate, id)
-			if err != nil {
-				respondJSONError(w, "Failed to update new data", http.StatusBadRequest)
-				return
-			}
-		}
-		respondJSON(w, JSON{}, http.StatusOK)
-
-	default:
-		return
-	}
+    default:
+        return
+    }
 }

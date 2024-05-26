@@ -20,23 +20,25 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	// Создаем новый маршрутизатор
+	repo, err := connection.ConnectingDB()
+    if err != nil {
+        log.Fatal("Failed to connect to database")
+    }
+    defer repo.Close()
+
+    handler := &handlers.Handler{Repo: repo}
+
 	mux := http.NewServeMux()
 
-	// Обработчик для API
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandler)
-	mux.HandleFunc("/api/task", handlers.TaskHandler)
-	mux.HandleFunc("/api/tasks", handlers.ListTasksHandler)
-	mux.HandleFunc("/api/task/done", handlers.DoneTaskHandler)
+	mux.HandleFunc("/api/task", handler.TaskHandler)
+	mux.HandleFunc("/api/tasks", handler.ListTasksHandler)
+	mux.HandleFunc("/api/task/done", handler.DoneTaskHandler)
 
-	// Обработчик для статических файлов
 	fs := http.FileServer(http.Dir("web"))
 	mux.Handle("/", http.StripPrefix("/", fs))
 
 	fmt.Println("server is running")
-
-	db := connection.ConnectingDB()
-	defer db.Close()
 
 	err = http.ListenAndServe(os.Getenv("TODO_PORT"), mux)
 	if err != nil {

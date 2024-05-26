@@ -9,22 +9,18 @@ import (
 
 func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err error) {
 
-	/* if len(repeat) == 0 {
-		// расписать вариант с удалением задачи
-	} */
-
-	correctDate, err := time.Parse("20060102", Date) // по умолчанию входить должно "date" из DB, в основной функции я временно назвал это datelinefromDB
+	correctDate, err := time.Parse("20060102", Date)
 	if err != nil {
-		return "", errors.New("invalid date format (DB)") // здесь проверяем в верном ли формате была изначальная дата (это исходное время (из БД), от которого начинается отсчёт повторений)
+		return "", errors.New("invalid date format (DB)")
 	}
 
 	if Repeat[0] != 'd' && Repeat[0] != 'y' && Repeat[0] != 'w' && Repeat[0] != 'm' {
-		return "", errors.New("invalid repetition rate") // здесь первоначально проверяем на корректность поля repeat (из БД)
+		return "", errors.New("invalid repetition rate")
 	}
 
 	parts := strings.Split(Repeat, " ")
 
-	if parts[0] == "y" { // вариант с годом
+	if parts[0] == "y" {
 		if len(parts) != 1 {
 			return "", errors.New("invalid repetition rate")
 		}
@@ -35,7 +31,7 @@ func NextDate(Now time.Time, Date string, Repeat string) (Alarm string, Err erro
 		Alarm = tmp.Format("20060102")
 	}
 
-	if parts[0] == "d" { // вариант с днями
+	if parts[0] == "d" {
 		if len(parts) != 2 {
 			return "", errors.New("invalid repetition rate")
 		}
