@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
-	_ "modernc.org/sqlite"
+	"log"
 
 	"github.com/noctusha/finalya/connection"
 	"github.com/noctusha/finalya/models"
@@ -27,12 +26,18 @@ func respondJSON(w http.ResponseWriter, payload interface{}, statusCode int) {
 	response, err := json.Marshal(payload)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+		_, writeErr := w.Write([]byte("Internal server error"))
+		if writeErr != nil {
+			log.Printf("Error writing an error in respondJSON: %v", writeErr)
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(statusCode)
-	w.Write(response)
+	_, writeErr := w.Write(response)
+		if writeErr != nil {
+			log.Printf("Error writing response in respondJSON: %v", writeErr)
+		}
 }
 
 func respondJSONError(w http.ResponseWriter, message string, statusCode int) {
@@ -63,7 +68,10 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(nextDate))
+	_, writeErr := w.Write(([]byte(nextDate)))
+		if writeErr != nil {
+			log.Printf("Error writing response in NextDateHandler: %v", writeErr)
+		}
 }
 
 func (h *Handler) NewTask(w http.ResponseWriter, r *http.Request) {

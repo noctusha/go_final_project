@@ -40,7 +40,7 @@ func main() {
 
 	fmt.Println("server is running")
 
-	err = http.ListenAndServe(os.Getenv("TODO_PORT"), mux)
+	err = http.ListenAndServe(":" + os.Getenv("TODO_PORT"), mux)
 	if err != nil {
 		log.Fatal("Error handling Listen and Serve")
 	}

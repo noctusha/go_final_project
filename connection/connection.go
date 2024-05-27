@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/noctusha/finalya/models"
-	_ "modernc.org/sqlite"
 )
 
 type Repository struct {
